@@ -13,6 +13,7 @@ f.close()
 
 # RSA
 (client_public, client_private) = rsa.newkeys(512)
+print(client_public)
 
 # Global variables
 client_id_global = None
@@ -32,12 +33,21 @@ def separate_message(message):
     flags.frombytes(message[4:6])
     length = int.from_bytes(message[6:8], byteorder='big')
     body = message[8:length]
+    print(body)
+    body = body.decode('ASCII')
 
     return (client_id, flags, length, body)
+
+# Decrypts the message
+def decrypt_message(message):
+    decrypted_message = rsa.decrypt(message, client_private)
+    print(decrypted_message)
+    return decrypted_message
 
 # Creates a tab
 def createTab():
     global server_public
+    global client_id_global
 
     if client_id_global == None:
         print('Creating tab')
@@ -46,9 +56,8 @@ def createTab():
         # RSA Exchange
         try:
             # RSA Message
-            p = packet.packet(False, True, False, 0, None, None, str(client_public.n))
-            packet_bytes = p.encrypted_raw
-            client.sendto(packet_bytes, (config.address, config.port))
+            p = packet.packet(False, True, False, 0, None, None, str(client_public))
+            client.sendto(p.encrypted_raw, (config.address, config.port))
             print('rsa sent')
 
             # ACK Recieve
@@ -63,8 +72,8 @@ def createTab():
             message, server = client.recvfrom(config.buffer_size)
             (client_id, flags, length, body) = separate_message(message)
             if flags[0] == 1 & flags[1] == 1:
-                server_public = body
-                print('rsa recieved')
+                server_public = rsa.PublicKey(int(body[10:164]), int(body[166:171]))
+                print('rsa recieved ' + body)
 
                 # Send empty ACK
                 p = packet.packet(True, False, False, 0, None, None, None)
@@ -75,8 +84,43 @@ def createTab():
             # TODO: Timeout
             print('timeout!')
             input()
+            return
 
-        # TODO: id exchange
+        print('')
+
+        try:
+            # OPEN Message
+            p = packet.packet(False, False, False, 0, None, server_public, "OPEN")
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('open sent')
+
+            # ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (client_id, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('ack recieved')
+            else:
+                print('err')
+
+            # ID Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            message = decrypt_message(message)
+            (client_id, flags, length, body) = separate_message(message)
+            split = body.split(' ')
+            if split[0] == "SETID":
+                client_id_global = int(split[1])
+                print('id recieved ' + str(client_id_global))
+
+                # Send empty ACK
+                p = packet.packet(True, False, False, 0, None, None, None)
+                client.sendto(p.encrypted_raw, (config.address, config.port))
+                print('ack sent')
+
+        except socket.timeout as inst:
+            # TODO: Timeout
+            print('timeout!')
+            input()
+            return
 
     else:
         print('You already have an existing tab')

@@ -1,5 +1,6 @@
 # Imports
 from bitarray import bitarray
+import rsa
 
 # Packet class
 class packet:
@@ -96,3 +97,4 @@ class packet:
             self.encrypted_raw = self.raw
         else:
             print('encrypting message')
+            self.encrypted_raw = rsa.encrypt(self.raw, self.key)

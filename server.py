@@ -23,9 +23,8 @@ def send_public_key(address):
     # RSA Exchange
     try:
         # RSA Message
-        p = packet.packet(True, True, False, 0, None, None, str(server_public.n))
-        packet_bytes = p.encrypted_raw
-        server.sendto(packet_bytes, address)
+        p = packet.packet(True, True, False, 0, None, None, str(server_public))
+        server.sendto(p.encrypted_raw, address)
         print('rsa sent')
 
         # ACK Recieve
@@ -41,38 +40,64 @@ def send_public_key(address):
         print('timeout!')
         input()
 
-# Creates a unique auth code
-def createAuthCode():
-    found = False
+def send_id(client):
+    # Send ID
+    try:
+        # ID Message
+        msg = "SETID " + str(client.client_id)
+        p = packet.packet(False, False, False, 0, None, client.client_public, msg)
+        packet_bytes = p.encrypted_raw
+        server.sendto(packet_bytes, client.address)
+        print('ID sent')
 
-    # TODO: fix
-    prev = -1
-    for k, v in ids.items():
-        if (k - prev) != 1:
-            x = k
-            found = True
-            break
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
         else:
-            prev = k
+            print('err')
+
+    except socket.timeout as inst:
+        # TODO: Timeout
+        print('timeout!')
+        input()
+
+# Creates a unique ID code
+def createIdCode():
+    
+    if len(clients) == max_clients:
+        print('there is already the maximum number of clients')
+        return
+
+    if len(clients) == 0:
+        return 1
+
+    # Algorithm which finds the lowest available ID number
+    found = False
+    new_id = -1
+    prev = 0
+    for c in clients:
+        if c.client_id != 0:
+            if (c.client_id - prev) != 1:
+                new_id = c.client_id
+                found = True
+                break
+            else:
+                prev = c.client_id
 
     if found == False:
-        if len(ids.items()) == 1:
-            x = 1
-        else:
-            x = len(ids.items())
+        new_id = len(clients)
 
-    if x > max_ids:
-        print('the maximum number of tabs has been created')
+    if new_id == -1:
+        print('cannot find id')
     else:
-        ids[x] = 0
-        print('created new tab with id: ' + x)
-    
-    return x
+        return new_id
 
 # Decrypts the message
 def decrypt_message(message):
-    message = rsa.decrypt(messsage, server_private)
-    message = message.decode('ASCII')
+    decrypted_message = rsa.decrypt(message, server_private)
+    print(decrypted_message)
     return decrypted_message
 
 # Separates the message into components
@@ -82,6 +107,7 @@ def separate_message(message):
     flags.frombytes(message[4:6])
     length = int.from_bytes(message[6:8], byteorder='big')
     body = message[8:length]
+    body = body.decode('ASCII')
 
     return (client_id, flags, length, body)
 
@@ -95,13 +121,28 @@ def process_message(client_id, flags, length, body, address):
         # First sets the client key in mapping
         for c in clients:
             if c.address == address:
-                c.client_public = body
+                print(body[10:163])
+                print(body[166:170])
+                c.client_public = rsa.PublicKey(int(body[10:164]), int(body[166:171]))
                 break
 
         # Then sends public key
         send_public_key(address)
+    
+    # OPEN Tab
+    elif body == "OPEN":
+        # Creates ID
+        new_id = createIdCode()
 
-    return 0
+        client = None
+        # Applys ID
+        for c in clients:
+            if c.address == address:
+                c.client_id = new_id
+                client = c
+                break
+
+        send_id(client)
 
 #
 while True:
