@@ -7,4 +7,7 @@ address = "127.0.0.1"
 port = 12000
 
 # Max Buffer Size
-buffer_size = 1024
+buffer_size = 4096
+
+# RSA Key Size
+key_size = 512

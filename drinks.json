@@ -1,19 +1,34 @@
 {
     "drinks": [
         {
-            "id": "1",
-            "name": "a",
-            "price": 3.49
+            "id": "01",
+            "name": "Beer",
+            "price": 1.65
         },
         {
-            "id": "2",
-            "name": "b",
+            "id": "02",
+            "name": "Cider",
+            "price": 1.40
+        },
+        {
+            "id": "03",
+            "name": "Wine",
             "price": 4.99
         },
         {
-            "id": "3",
-            "name": "c",
-            "price": 5.99
+            "id": "04",
+            "name": "Vodka",
+            "price": 2.49
+        },
+        {
+            "id": "05",
+            "name": "Whiskey",
+            "price": 3.00
+        },
+        {
+            "id": "06",
+            "name": "Cola",
+            "price": 1.20
         }
     ]
 }

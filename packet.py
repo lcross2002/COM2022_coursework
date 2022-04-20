@@ -4,16 +4,17 @@ from bitarray import bitarray
 # Packet class
 class packet:
     # Constructor
-    def __init__(self, ack, nack, rsa, flags, id, body):
+    def __init__(self, ack, rsa, fin, client_id, flags, key, body):
+        # Fields
         self.raw = None
         self.encrypted_raw = None
-        self.length = 0
-        self.checksum = 0
         self.ack = ack
-        self.nack = nack
         self.rsa = rsa
+        self.fin = fin
         self.flags = flags
-        self.id = id
+        self.key = key
+        self.length = 0
+        self.id = client_id
         self.body = body
 
         # Processes the packet once fields are initalised
@@ -24,9 +25,6 @@ class packet:
         # Calculate length
         self.calculate_length()
 
-        # Calculate checksum
-        self.calculate_checksum()
-
         # Convert to bytes
         self.convert_to_bytes()
 
@@ -35,22 +33,16 @@ class packet:
 
     # Calculates length
     def calculate_length(self):
-        self.length = 12 + len(bytes(self.body, 'ASCII'))
-
-    # Calculates checksum
-    def calculate_checksum(self):
-        # TODO
-        return 0
+        if self.body != None:
+            self.length = 8 + len(bytes(self.body, 'ASCII'))
+        else:
+            self.length = 8
 
     # Converts the packet to bytes
     def convert_to_bytes(self):
-        # Convert length to bytes
-        length_bytes = self.length.to_bytes(4, byteorder='big')
+        id_bytes = self.id.to_bytes(4, byteorder='big')
+        total = id_bytes
 
-        # Convert the checksum to bytes
-        checksum_bytes = self.checksum.to_bytes(4, byteorder='big')
-
-        # Convert flags to bytes
         total_flags = bitarray()
 
         # ACK
@@ -59,14 +51,14 @@ class packet:
         else:
             total_flags.append(0)
 
-        # NACK
-        if self.nack:
+        # RSA
+        if self.rsa:
             total_flags.append(1)
         else:
             total_flags.append(0)
 
-        # RSA
-        if self.rsa:
+        # FIN
+        if self.fin:
             total_flags.append(1)
         else:
             total_flags.append(0)
@@ -83,15 +75,16 @@ class packet:
 
         # Convert the bitarray to bytes
         flag_bytes = total_flags.tobytes()
+        total = total + flag_bytes
 
-        # Convert id to bytes
-        id_bytes = self.id.to_bytes(2, byteorder='big')
+        # Convert length to bytes
+        length_bytes = self.length.to_bytes(2, byteorder='big')
+        total = total + length_bytes
 
         # Convert body to bytes
-        body_bytes = bytes(self.body, 'ASCII')
-
-        # Combine them
-        total = length_bytes + checksum_bytes + flag_bytes + id_bytes + body_bytes
+        if self.body != None:
+            body_bytes = bytes(self.body, 'ASCII')
+            total = total + body_bytes
 
         # Set the field to the total
         self.raw = total
@@ -99,4 +92,7 @@ class packet:
     # Encrypts the packet
     def encrypt_packet(self):
         # TODO
-        self.encrypted_raw = self.raw
+        if self.key == None:
+            self.encrypted_raw = self.raw
+        else:
+            print('encrypting message')

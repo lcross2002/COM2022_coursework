@@ -1,17 +1,23 @@
 # Imports
+from bitarray import bitarray
 import socket
 import config
 import packet
 import json
+import rsa
 
 # Loading JSON
 f = open('drinks.json')
 data = json.load(f)
 f.close()
 
+# RSA
+(client_public, client_private) = rsa.newkeys(512)
+
 # Global variables
-auth_code = None
+client_id_global = None
 tab = 0
+server_public = None
 
 # Socket settings
 socket.setdefaulttimeout(1)
@@ -19,41 +25,67 @@ socket.setdefaulttimeout(1)
 # Creates socket [address type, udp]
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+# Separates the message into components
+def separate_message(message):
+    client_id = int.from_bytes(message[0:4], byteorder='big')
+    flags = bitarray(endian='big')
+    flags.frombytes(message[4:6])
+    length = int.from_bytes(message[6:8], byteorder='big')
+    body = message[8:length]
+
+    return (client_id, flags, length, body)
+
 # Creates a tab
 def createTab():
-    if auth_code == None:
+    global server_public
+
+    if client_id_global == None:
         print('Creating tab')
+        print('')
+
+        # RSA Exchange
         try:
-            p = packet.packet(True, False, False, None, 12, 'OPEN')
+            # RSA Message
+            p = packet.packet(False, True, False, 0, None, None, str(client_public.n))
             packet_bytes = p.encrypted_raw
             client.sendto(packet_bytes, (config.address, config.port))
+            print('rsa sent')
 
-            data, server = client.recvfrom(config.buffer_size)            
+            # ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (client_id, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('ack recieved')
+            else:
+                print('err')
+
+            # RSA Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (client_id, flags, length, body) = separate_message(message)
+            if flags[0] == 1 & flags[1] == 1:
+                server_public = body
+                print('rsa recieved')
+
+                # Send empty ACK
+                p = packet.packet(True, False, False, 0, None, None, None)
+                client.sendto(p.encrypted_raw, (config.address, config.port))
+                print('ack sent')
 
         except socket.timeout as inst:
+            # TODO: Timeout
             print('timeout!')
+            input()
+
+        # TODO: id exchange
 
     else:
         print('You already have an existing tab')
+        input()
+        print('')
 
 # Adds to an existing tab
 def addToTab():
-    print('')
-
-    # Only works if there is an auth code
-    if auth_code == None:
-        print('You have not set up a tab')
-        print('')
-    else:
-        # Outputs available drinks
-        print('drinks:')
-        for drink in data['drinks']:
-            print('[' + drink['id'] + '] - ' + drink['name'] + ': ' + str(drink['price']))
-        
-        print()
-        print('Enter a value from inside the brackets:')
-
-        drink_choice = input()
+    return 0
 
 # Views existing tab value
 def viewTab():
@@ -63,9 +95,10 @@ def viewTab():
 def closeTab():
     return 0
 
+
 # 
 while True:
-    # Resets global variable
+    # Resets variable
     user_input = None
 
     print('')
