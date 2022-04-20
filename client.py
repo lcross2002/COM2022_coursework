@@ -79,9 +79,8 @@ def createTab():
                 print('ack sent')
 
         except socket.timeout as inst:
-            # TODO: Timeout
             print('timeout!')
-            input()
+            createTab()
             return
 
         print('')
@@ -116,9 +115,8 @@ def createTab():
                 print('ack sent')
 
         except socket.timeout as inst:
-            # TODO: Timeout
             print('timeout!')
-            input()
+            createTab()
             return
 
     else:
@@ -195,10 +193,8 @@ def addToTab():
             print('ack sent')
 
     except socket.timeout as inst:
-        # TODO: Timeout
         print('timeout!')
-        input()
-        return
+        addToTab()
 
 # Views existing tab value
 def viewTab():
@@ -249,10 +245,8 @@ def closeTab():
             print('err')
 
     except socket.timeout as inst:
-        # TODO: Timeout
         print('timeout!')
-        input()
-        return
+        closeTab()
 
 # 
 while True:

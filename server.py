@@ -42,9 +42,8 @@ def send_public_key(address):
             print('err')
 
     except socket.timeout as inst:
-        # TODO: Timeout
         print('timeout!')
-        input()
+        send_public_key(address)
 
 def send_id(client):
     # Send ID
@@ -65,9 +64,8 @@ def send_id(client):
             print('err')
 
     except socket.timeout as inst:
-        # TODO: Timeout
         print('timeout!')
-        input()
+        send_id(client)
 
 # Creates a unique ID code
 def create_id_code():
@@ -141,9 +139,8 @@ def add_to_tab(client, body):
                     print('err')
             
             except socket.timeout as inst:
-                # TODO: Timeout
                 print('timeout!')
-                input()
+                add_to_tab(client, body)
 
             break
 
@@ -173,9 +170,8 @@ def close_tab(client):
                 break
 
     except socket.timeout as inst:
-        # TODO: Timeout
         print('timeout!')
-        input()
+        close_tab(client)
     
     return 0
 
