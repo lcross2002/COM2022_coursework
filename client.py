@@ -5,6 +5,7 @@ import config
 import packet
 import json
 import rsa
+import random
 
 # Loading JSON
 f = open('drinks.json')
@@ -127,6 +128,25 @@ def createTab():
 # Adds to an existing tab
 def addToTab():
     global tab
+
+    # True means corrupt packet
+    x = random.choice([True, False])
+    print(x)
+    if x == True:
+        try:
+            p = packet.packet(False, False, False, client_id_global, None, server_public, "EOSTUOTUHSETOUESHTAOEUTH")
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('sent corrupt packet')
+
+            message, server = client.recvfrom(config.buffer_size)
+            message, server = client.recvfrom(config.buffer_size)
+
+        except socket.timeout as inst:
+            print('timeout')
+            addToTab()
+            return
+
+        return
 
     if client_id_global == None:
         print('You do not have a tab to add to!')
@@ -255,6 +275,7 @@ while True:
 
     print('')
     print('Welcome to The Client of the Bar Tab Protocol (BTP)')
+    print('(Corrupt packet example has a chance to happen when adding to a tab)')
     print('')
     print('Commands:')
     print('')
