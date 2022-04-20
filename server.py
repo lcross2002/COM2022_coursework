@@ -147,6 +147,38 @@ def add_to_tab(client, body):
 
             break
 
+def close_tab(client):
+    global clients
+    
+    # Close tab
+    try:
+        # Fin Message
+        msg = "TOTAL " + str(client.total)
+        p = packet.packet(False, False, True, client.client_id, None, client.client_public, msg)
+        server.sendto(p.encrypted_raw, client.address)
+        print('fin total sent')
+
+        # ACK FIN Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and flags[2] == 1:
+            print('ack fin recieved')
+        else:
+            print('err')
+
+        # Remove from list
+        for c in clients:
+            if c.address == client.address:
+                clients.remove(c)
+                break
+
+    except socket.timeout as inst:
+        # TODO: Timeout
+        print('timeout!')
+        input()
+    
+    return 0
+
 # Decrypts the message
 def decrypt_message(message):
     decrypted_message = rsa.decrypt(message, server_private)
@@ -201,13 +233,25 @@ def process_message(client_id, flags, length, body, address):
     elif body[0:3] == "ADD":
         client = None
         
-        # Applys ID
+        # Finds client
         for c in clients:
             if c.address == address:
                 client = c
                 break
 
         add_to_tab(client, body)
+
+    elif body[0:5] == "CLOSE":
+        client = None
+        
+        # Finds client
+        for c in clients:
+            if c.address == address:
+                client = c
+                break
+
+        close_tab(client)
+
 #
 while True:
     # Retrieve

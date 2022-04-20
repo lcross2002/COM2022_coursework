@@ -196,9 +196,9 @@ def addToTab():
 
     except socket.timeout as inst:
         # TODO: Timeout
-            print('timeout!')
-            input()
-            return
+        print('timeout!')
+        input()
+        return
 
 # Views existing tab value
 def viewTab():
@@ -206,8 +206,53 @@ def viewTab():
 
 # Closes a tab
 def closeTab():
-    return 0
+    global client_id_global
+    global server_public
 
+    print('closing tab')
+    print('')
+
+    # Closing tab
+    try:
+        # Close message
+        p = packet.packet(False, False, False, client_id_global, None, server_public, 'CLOSE')
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('close tab sent')
+
+        # ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
+
+        # Fin Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        message = decrypt_message(message)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 0 and flags[2] == 1:
+            print('fin recieved')
+            print(body)
+
+            # Send empty ACK
+            p = packet.packet(True, False, True, 0, None, None, None)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
+
+            # Reset global variables
+            client_id_global = None
+            tab = 0
+            server_public = None
+
+        else:
+            print('err')
+
+    except socket.timeout as inst:
+        # TODO: Timeout
+        print('timeout!')
+        input()
+        return
 
 # 
 while True:
