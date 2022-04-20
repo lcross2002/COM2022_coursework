@@ -12,8 +12,7 @@ data = json.load(f)
 f.close()
 
 # RSA
-(client_public, client_private) = rsa.newkeys(512)
-print(client_public)
+(client_public, client_private) = rsa.newkeys(512, accurate=True)
 
 # Global variables
 client_id_global = None
@@ -33,7 +32,6 @@ def separate_message(message):
     flags.frombytes(message[4:6])
     length = int.from_bytes(message[6:8], byteorder='big')
     body = message[8:length]
-    print(body)
     body = body.decode('ASCII')
 
     return (client_id, flags, length, body)
@@ -104,6 +102,7 @@ def createTab():
 
             # ID Recieve
             message, server = client.recvfrom(config.buffer_size)
+            print(message)
             message = decrypt_message(message)
             (client_id, flags, length, body) = separate_message(message)
             split = body.split(' ')
@@ -129,7 +128,77 @@ def createTab():
 
 # Adds to an existing tab
 def addToTab():
-    return 0
+    global tab
+
+    if client_id_global == None:
+        print('You do not have a tab to add to!')
+        print('Press enter to continue:')
+        input()
+        print('')
+        return
+
+    # Get user drink choice
+    drinks = data['drinks']
+
+    print('drinks:')
+    for drink in drinks:
+        print('[' + str(drink['id']) + '] - ' + drink['name'] + ': £' + str(drink['price']))
+
+    print('')
+    print('Enter a value from inside the brackets:')
+    choice = input()
+
+    found = False
+    for drink in drinks:
+        if drink['id'] == choice:
+            found = True
+            break
+
+    if found == False:
+        print('this drink does not exist')
+        print('')
+        return
+
+    print('')
+    print('Enter the quantity:')
+    quantity = input()
+
+    # Send drink choice
+    try:
+        # Add drink Message
+        msg = "ADD " + str(choice) + " " + str(quantity)
+        p = packet.packet(False, False, False, client_id_global, None, server_public, msg)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('add drink sent')
+
+        # ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
+
+        # Total Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        print(message)
+        message = decrypt_message(message)
+        (client_id, flags, length, body) = separate_message(message)
+        split = body.split(' ')
+        if split[0] == "TOTAL":
+            tab = float(split[1])
+            print('total recieved ' + str(tab))
+
+            # Send empty ACK
+            p = packet.packet(True, False, False, 0, None, None, None)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
+
+    except socket.timeout as inst:
+        # TODO: Timeout
+            print('timeout!')
+            input()
+            return
 
 # Views existing tab value
 def viewTab():
@@ -160,6 +229,8 @@ while True:
 
     user_input = input()
 
+    print('')
+
     if user_input == '1':
         createTab()
     elif user_input == '2':
@@ -175,3 +246,4 @@ while True:
         print('This is not a valid command!')
         print('Press enter to continue:')
         input()
+        print('')

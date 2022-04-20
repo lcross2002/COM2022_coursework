@@ -97,4 +97,5 @@ class packet:
             self.encrypted_raw = self.raw
         else:
             print('encrypting message')
+            print(self.key)
             self.encrypted_raw = rsa.encrypt(self.raw, self.key)

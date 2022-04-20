@@ -5,9 +5,15 @@ import config
 import packet
 import mapping
 import rsa
+import json
+
+# Loading JSON
+f = open('drinks.json')
+data = json.load(f)
+f.close()
 
 # RSA
-(server_public, server_private) = rsa.newkeys(512)
+(server_public, server_private) = rsa.newkeys(512, accurate=True)
 
 # Global variables
 clients = []
@@ -64,7 +70,7 @@ def send_id(client):
         input()
 
 # Creates a unique ID code
-def createIdCode():
+def create_id_code():
     
     if len(clients) == max_clients:
         print('there is already the maximum number of clients')
@@ -94,6 +100,53 @@ def createIdCode():
     else:
         return new_id
 
+def add_to_tab(client, body):
+    global clients
+
+    split = body.split(' ')
+    drink = split[1]
+    quantity = int(split[2])
+
+    price = -1
+    drinks = data['drinks']
+    for d in drinks:
+        if d['id'] == drink:
+            price = d['price']
+            break
+
+    if price == -1:
+        print('could not find drink with that id')
+        return
+
+    total = price * quantity
+
+    for c in clients:
+        if c.client_id == client.client_id:
+            c.total = c.total + total
+
+            # Total Message
+            try:
+                # Total Message
+                msg = "TOTAL " + str(c.total)
+                p = packet.packet(False, False, False, c.client_id, None, c.client_public, msg)
+                server.sendto(p.encrypted_raw, client.address)
+                print('total sent')
+
+                # ACK Recieve
+                message, address = server.recvfrom(config.buffer_size)
+                (client_id, flags, length, body) = separate_message(message)
+                if flags[0] == 1:
+                    print('ack recieved')
+                else:
+                    print('err')
+            
+            except socket.timeout as inst:
+                # TODO: Timeout
+                print('timeout!')
+                input()
+
+            break
+
 # Decrypts the message
 def decrypt_message(message):
     decrypted_message = rsa.decrypt(message, server_private)
@@ -121,8 +174,8 @@ def process_message(client_id, flags, length, body, address):
         # First sets the client key in mapping
         for c in clients:
             if c.address == address:
-                print(body[10:163])
-                print(body[166:170])
+                print(body[10:164])
+                print(body[166:171])
                 c.client_public = rsa.PublicKey(int(body[10:164]), int(body[166:171]))
                 break
 
@@ -132,7 +185,7 @@ def process_message(client_id, flags, length, body, address):
     # OPEN Tab
     elif body == "OPEN":
         # Creates ID
-        new_id = createIdCode()
+        new_id = create_id_code()
 
         client = None
         # Applys ID
@@ -144,6 +197,17 @@ def process_message(client_id, flags, length, body, address):
 
         send_id(client)
 
+    # ADD to tab
+    elif body[0:3] == "ADD":
+        client = None
+        
+        # Applys ID
+        for c in clients:
+            if c.address == address:
+                client = c
+                break
+
+        add_to_tab(client, body)
 #
 while True:
     # Retrieve
