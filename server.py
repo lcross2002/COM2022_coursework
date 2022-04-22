@@ -26,6 +26,8 @@ server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server.bind(('', config.port))
 
 def send_public_key(address):
+    server.settimeout(1)
+
     # RSA Exchange
     try:
         # RSA Message
@@ -45,7 +47,11 @@ def send_public_key(address):
         print('timeout!')
         send_public_key(address)
 
+    server.settimeout(None)
+
 def send_id(client):
+    server.settimeout(1)
+
     # Send ID
     try:
         # ID Message
@@ -66,6 +72,8 @@ def send_id(client):
     except socket.timeout as inst:
         print('timeout!')
         send_id(client)
+
+    server.settimeout(None)
 
 # Creates a unique ID code
 def create_id_code():
@@ -99,6 +107,8 @@ def create_id_code():
         return new_id
 
 def add_to_tab(client, body):
+    server.settimeout(1)
+
     global clients
 
     split = body.split(' ')
@@ -144,7 +154,11 @@ def add_to_tab(client, body):
 
             break
 
+    server.settimeout(None)
+
 def close_tab(client):
+    server.settimeout(1)
+
     global clients
     
     # Close tab
@@ -172,8 +186,8 @@ def close_tab(client):
     except socket.timeout as inst:
         print('timeout!')
         close_tab(client)
-    
-    return 0
+
+    server.settimeout(None)
 
 # Decrypts the message
 def decrypt_message(message):
