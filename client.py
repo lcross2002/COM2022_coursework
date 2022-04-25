@@ -28,14 +28,13 @@ client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Separates the message into components
 def separate_message(message):
-    client_id = int.from_bytes(message[0:4], byteorder='big')
+    sequence = int.from_bytes(message[0:4], byteorder='big')
     flags = bitarray(endian='big')
     flags.frombytes(message[4:6])
     length = int.from_bytes(message[6:8], byteorder='big')
-    body = message[8:length]
-    body = body.decode('ASCII')
+    body = message[8:len(message)]
 
-    return (client_id, flags, length, body)
+    return (sequence, flags, length, body)
 
 # Decrypts the message
 def decrypt_message(message):
@@ -43,8 +42,7 @@ def decrypt_message(message):
     print(decrypted_message)
     return decrypted_message
 
-# Creates a tab
-def createTab():
+def rsa_exchange():
     global server_public
     global client_id_global
 
@@ -52,78 +50,120 @@ def createTab():
         print('Creating tab')
         print('')
 
+        sequence_check = 0
+
         # RSA Exchange
         try:
             # RSA Message
-            p = packet.packet(False, True, False, 0, None, None, str(client_public))
+            p = packet.packet(False, True, False, sequence_check, None, None, client_public.save_pkcs1(), True)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('rsa sent')
+            waitingForAck = True
 
             # ACK Recieve
             message, server = client.recvfrom(config.buffer_size)
-            (client_id, flags, length, body) = separate_message(message)
-            if flags[0] == 1:
-                print('ack recieved')
+            waitingForAck = False
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1 and sequence == sequence_check:
+                print('correct ack recieved')
+                sequence_check += 1
             else:
                 print('err')
+                rsa_exchange()
+                return
 
             # RSA Recieve
             message, server = client.recvfrom(config.buffer_size)
-            (client_id, flags, length, body) = separate_message(message)
+            (sequence, flags, length, body) = separate_message(message)
             if flags[0] == 1 & flags[1] == 1:
-                server_public = rsa.PublicKey(int(body[10:164]), int(body[166:171]))
-                print('rsa recieved ' + body)
+                server_public = rsa.PublicKey.load_pkcs1(body)
+                print('rsa recieved ' + str(body))
 
                 # Send empty ACK
-                p = packet.packet(True, False, False, 0, None, None, None)
+                p = packet.packet(True, False, False, sequence_check, None, None, None, False)
                 client.sendto(p.encrypted_raw, (config.address, config.port))
                 print('ack sent')
 
         except socket.timeout as inst:
             print('timeout!')
-            createTab()
+            
+            if waitingForAck == True:
+                print('err no ack recieved ' + str(sequence_check))
+            
+            rsa_exchange()
             return
 
-        print('')
-
-        try:
-            # OPEN Message
-            p = packet.packet(False, False, False, 0, None, server_public, "OPEN")
-            client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('open sent')
-
-            # ACK Recieve
-            message, server = client.recvfrom(config.buffer_size)
-            (client_id, flags, length, body) = separate_message(message)
-            if flags[0] == 1:
-                print('ack recieved')
-            else:
-                print('err')
-
-            # ID Recieve
-            message, server = client.recvfrom(config.buffer_size)
-            print(message)
-            message = decrypt_message(message)
-            (client_id, flags, length, body) = separate_message(message)
-            split = body.split(' ')
-            if split[0] == "SETID":
-                client_id_global = int(split[1])
-                print('id recieved ' + str(client_id_global))
-
-                # Send empty ACK
-                p = packet.packet(True, False, False, 0, None, None, None)
-                client.sendto(p.encrypted_raw, (config.address, config.port))
-                print('ack sent')
-
-        except socket.timeout as inst:
-            print('timeout!')
-            createTab()
-            return
+        print('rsa exchange completed')
 
     else:
         print('You already have an existing tab')
         input()
         print('')
+
+def open_tab():
+    global server_public
+    global client_id_global
+
+    print('')
+
+    sequence_check = 2
+
+    try:
+        # OPEN Message
+        p = packet.packet(False, False, False, sequence_check, None, server_public, "OPEN", False)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('open sent')
+
+        # ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err wrong ack')
+
+        sequence_check += 1
+
+        # ID Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        print(message)
+        (sequence, flags, length, body) = separate_message(message)
+        msg = decrypt_message(body)
+        msg = msg.decode('ASCII')
+        split = msg.split(' ')
+        if split[0] == "SETID":
+            client_id_global = int(split[1])
+            print('id recieved ' + str(client_id_global))
+
+            # Send empty ACK
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
+
+            # Send FIN
+            p = packet.packet(True, False, True, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('fin ack sent')
+
+            # Final ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('fin ack recieved')
+            else:
+                print('err')
+
+            print('id exchange completed')
+
+    except socket.timeout as inst:
+        print('timeout!')
+        open_tab()
+        return
+
+# Creates a tab
+def createTab():
+    rsa_exchange()
+    open_tab()
 
 # Adds to an existing tab
 def addToTab():

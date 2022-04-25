@@ -5,7 +5,7 @@ import rsa
 # Packet class
 class packet:
     # Constructor
-    def __init__(self, ack, rsa, fin, client_id, flags, key, body):
+    def __init__(self, ack, rsa, fin, sequence, flags, key, body, isRSAKey):
         # Fields
         self.raw = None
         self.encrypted_raw = None
@@ -15,8 +15,9 @@ class packet:
         self.flags = flags
         self.key = key
         self.length = 0
-        self.id = client_id
+        self.sequence = sequence
         self.body = body
+        self.isRSAKey = isRSAKey
 
         # Processes the packet once fields are initalised
         self.process_packet()
@@ -34,16 +35,20 @@ class packet:
 
     # Calculates length
     def calculate_length(self):
-        if self.body != None:
+        if self.isRSAKey:
+            self.length = 8 + len(self.body)
+        elif self.body != None:
             self.length = 8 + len(bytes(self.body, 'ASCII'))
         else:
             self.length = 8
 
     # Converts the packet to bytes
     def convert_to_bytes(self):
-        id_bytes = self.id.to_bytes(4, byteorder='big')
-        total = id_bytes
+        # Sequence
+        sequence_bytes = self.sequence.to_bytes(4, byteorder='big')
+        total = sequence_bytes
 
+        # Flags
         total_flags = bitarray()
 
         # ACK
@@ -83,19 +88,19 @@ class packet:
         total = total + length_bytes
 
         # Convert body to bytes
-        if self.body != None:
-            body_bytes = bytes(self.body, 'ASCII')
-            total = total + body_bytes
+        if self.isRSAKey:
+            total = total + self.body
+        elif self.body != None:
+            self.body = bytes(self.body, 'ASCII')
 
         # Set the field to the total
         self.raw = total
 
     # Encrypts the packet
     def encrypt_packet(self):
-        # TODO
         if self.key == None:
             self.encrypted_raw = self.raw
         else:
-            print('encrypting message')
-            print(self.key)
-            self.encrypted_raw = rsa.encrypt(self.raw, self.key)
+            print('encrypting packet')
+            encrypted_body = rsa.encrypt(self.body, self.key)
+            self.encrypted_raw = self.raw + encrypted_body

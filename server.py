@@ -31,7 +31,7 @@ def send_public_key(address):
     # RSA Exchange
     try:
         # RSA Message
-        p = packet.packet(True, True, False, 0, None, None, str(server_public))
+        p = packet.packet(True, True, False, 1, None, None, server_public.save_pkcs1(), True)
         server.sendto(p.encrypted_raw, address)
         print('rsa sent')
 
@@ -42,6 +42,8 @@ def send_public_key(address):
             print('ack recieved')
         else:
             print('err')
+            send_public_key(address)
+            return
 
     except socket.timeout as inst:
         print('timeout!')
@@ -56,7 +58,7 @@ def send_id(client):
     try:
         # ID Message
         msg = "SETID " + str(client.client_id)
-        p = packet.packet(False, False, False, 0, None, client.client_public, msg)
+        p = packet.packet(False, False, False, 0, None, client.client_public, msg, False)
         packet_bytes = p.encrypted_raw
         server.sendto(packet_bytes, client.address)
         print('ID sent')
@@ -67,7 +69,22 @@ def send_id(client):
         if flags[0] == 1:
             print('ack recieved')
         else:
-            print('err')
+            print('err not ack')
+            send_id(client)
+            return
+
+        # FIN Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and flags[2] == 1:
+            print('fin ack recieved')
+        else:
+            print('err not fin ack recieved')
+
+        # Send ACK
+        p = packet.packet(True, False, True, sequence, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent fin ack')
 
     except socket.timeout as inst:
         print('timeout!')
@@ -190,24 +207,23 @@ def close_tab(client):
     server.settimeout(None)
 
 # Decrypts the message
-def decrypt_message(message):
-    decrypted_message = rsa.decrypt(message, server_private)
+def decrypt_message(body):
+    decrypted_message = rsa.decrypt(body, server_private)
     print(decrypted_message)
     return decrypted_message
 
 # Separates the message into components
 def separate_message(message):
-    client_id = int.from_bytes(message[0:4], byteorder='big')
+    sequence = int.from_bytes(message[0:4], byteorder='big')
     flags = bitarray(endian='big')
     flags.frombytes(message[4:6])
     length = int.from_bytes(message[6:8], byteorder='big')
-    body = message[8:length]
-    body = body.decode('ASCII')
+    body = message[8:len(message)]
 
-    return (client_id, flags, length, body)
+    return (sequence, flags, length, body)
 
 # Processes the message
-def process_message(client_id, flags, length, body, address):
+def process_message(sequence, flags, length, body, address):
     global clients
     
     # RSA Exchange
@@ -216,16 +232,14 @@ def process_message(client_id, flags, length, body, address):
         # First sets the client key in mapping
         for c in clients:
             if c.address == address:
-                print(body[10:164])
-                print(body[166:171])
-                c.client_public = rsa.PublicKey(int(body[10:164]), int(body[166:171]))
+                c.client_public = rsa.PublicKey.load_pkcs1(body)
                 break
 
         # Then sends public key
         send_public_key(address)
     
     # OPEN Tab
-    elif body == "OPEN":
+    elif body == b"OPEN":
         # Creates ID
         new_id = create_id_code()
 
@@ -267,12 +281,6 @@ while True:
     # Retrieve
     message, address = server.recvfrom(config.buffer_size)
     print('recieved message')
-
-    # Send empty ACK
-    p = packet.packet(True, False, False, 0, None, None, None)
-    server.sendto(p.encrypted_raw, address)
-    print('sent ack')
-
     print(message)
     print('')
 
@@ -286,16 +294,21 @@ while True:
                 found_client = c
                 break
 
+    # Seperates the message
+    (sequence, flags, length, body) = separate_message(message)
+
     # If address does not exist no need to decrypt message
     if found == True:
-        decrypted_message = decrypt_message(message)
+        decrypted_message = decrypt_message(body)
     else:
         c = mapping.mapping(0, address, None, 0)
         clients.append(c)
-        decrypted_message = message
+        decrypted_message = body
 
-    # Seperates the message
-    (client_id, flags, length, body) = separate_message(decrypted_message)
+    # Send empty generic ACK
+    p = packet.packet(True, False, False, sequence, None, None, None, False)
+    server.sendto(p.encrypted_raw, address)
+    print('sent generic ack')
 
     # Proceses the message
-    process_message(client_id, flags, length, body, address)
+    process_message(sequence, flags, length, decrypted_message, address)
