@@ -97,6 +97,7 @@ def rsa_exchange():
 
     else:
         print('You already have an existing tab')
+        print('Press enter to continue:')
         input()
         print('')
 
@@ -148,12 +149,12 @@ def open_tab():
             # Final ACK Recieve
             message, server = client.recvfrom(config.buffer_size)
             (sequence, flags, length, body) = separate_message(message)
-            if flags[0] == 1:
+            if flags[0] == 1 and flags[2] == 1:
                 print('fin ack recieved')
             else:
                 print('err')
 
-            print('id exchange completed')
+            print('open tab completed')
 
     except socket.timeout as inst:
         print('timeout!')
@@ -165,12 +166,71 @@ def createTab():
     rsa_exchange()
     open_tab()
 
+def send_drink(choice, quantity):
+    global client_id_global
+    global tab
+
+    # Send drink choice
+    try:
+        # Add drink Message
+        msg = str(client_id_global) + " ADD " + str(choice) + " " + str(quantity)
+        p = packet.packet(False, False, False, 0, None, server_public, msg, False)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('add drink sent')
+
+        # ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and sequence == 0:
+            print('correct ack recieved')
+        else:
+            print('err')
+            send_drink()
+            return
+
+        # Total Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        print(message)
+        (sequence, flags, length, body) = separate_message(message)
+        msg = decrypt_message(body)
+        msg = msg.decode('ASCII')
+        split = msg.split(' ')
+        if split[0] == "TOTAL":
+            tab = str(split[1])
+            print('total recieved ' + tab)
+
+            # Send empty ACK
+            p = packet.packet(True, False, False, 1, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
+
+            # Send ACK FIN
+            p = packet.packet(True, False, True, 2, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack fin sent')
+
+            # Final ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1 and flags[2] == 1:
+                print('fin ack recieved')
+            else:
+                print('err')
+
+            print('add to drink completed')
+
+    except socket.timeout as inst:
+        print('timeout!')
+        send_drink(choice, quantity)
+        return
+
 # Adds to an existing tab
 def addToTab():
     global tab
 
     # True means corrupt packet
-    x = random.choice([True, False])
+    x = False
+    #x = random.choice([True, False])
     print(x)
     if x == True:
         try:
@@ -183,7 +243,6 @@ def addToTab():
 
         except socket.timeout as inst:
             print('timeout')
-            addToTab()
             return
 
         return
@@ -221,40 +280,7 @@ def addToTab():
     print('Enter the quantity:')
     quantity = input()
 
-    # Send drink choice
-    try:
-        # Add drink Message
-        msg = "ADD " + str(choice) + " " + str(quantity)
-        p = packet.packet(False, False, False, client_id_global, None, server_public, msg)
-        client.sendto(p.encrypted_raw, (config.address, config.port))
-        print('add drink sent')
-
-        # ACK Recieve
-        message, server = client.recvfrom(config.buffer_size)
-        (client_id, flags, length, body) = separate_message(message)
-        if flags[0] == 1:
-            print('ack recieved')
-        else:
-            print('err')
-
-        # Total Recieve
-        message, server = client.recvfrom(config.buffer_size)
-        print(message)
-        message = decrypt_message(message)
-        (client_id, flags, length, body) = separate_message(message)
-        split = body.split(' ')
-        if split[0] == "TOTAL":
-            tab = float(split[1])
-            print('total recieved ' + str(tab))
-
-            # Send empty ACK
-            p = packet.packet(True, False, False, 0, None, None, None)
-            client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('ack sent')
-
-    except socket.timeout as inst:
-        print('timeout!')
-        addToTab()
+    send_drink(choice, quantity)
 
 # Views existing tab value
 def viewTab():

@@ -45,6 +45,8 @@ def send_public_key(address):
             send_public_key(address)
             return
 
+        print('rsa exchange completed')
+
     except socket.timeout as inst:
         print('timeout!')
         send_public_key(address)
@@ -58,14 +60,14 @@ def send_id(client):
     try:
         # ID Message
         msg = "SETID " + str(client.client_id)
-        p = packet.packet(False, False, False, 0, None, client.client_public, msg, False)
+        p = packet.packet(False, False, False, 1, None, client.client_public, msg, False)
         packet_bytes = p.encrypted_raw
         server.sendto(packet_bytes, client.address)
         print('ID sent')
 
         # ACK Recieve
         message, address = server.recvfrom(config.buffer_size)
-        (client_id, flags, length, body) = separate_message(message)
+        (sequence, flags, length, body) = separate_message(message)
         if flags[0] == 1:
             print('ack recieved')
         else:
@@ -75,16 +77,18 @@ def send_id(client):
 
         # FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
-        (client_id, flags, length, body) = separate_message(message)
+        (sequence, flags, length, body) = separate_message(message)
         if flags[0] == 1 and flags[2] == 1:
             print('fin ack recieved')
         else:
             print('err not fin ack recieved')
 
         # Send ACK
-        p = packet.packet(True, False, True, sequence, None, None, None, False)
+        p = packet.packet(True, False, True, 2, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
+
+        print('id exchange completed')
 
     except socket.timeout as inst:
         print('timeout!')
@@ -123,14 +127,54 @@ def create_id_code():
     else:
         return new_id
 
-def add_to_tab(client, body):
+def send_add_to_tab(client, total):
     server.settimeout(1)
 
-    global clients
+    # Total Message
+    try:
+        # Total Message
+        msg = "TOTAL " + str(c.total)
+        p = packet.packet(False, False, False, c.client_id, None, c.client_public, msg, False)
+        server.sendto(p.encrypted_raw, client.address)
+        print('total sent')
 
-    split = body.split(' ')
-    drink = split[1]
-    quantity = int(split[2])
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and sequence == 1:
+            print('ack recieved')
+        else:
+            print('err')
+            send_add_to_tab()
+            return
+
+        # FIN Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and flags[2] == 1:
+            print('fin ack recieved')
+        else:
+            print('err not fin ack recieved')
+
+        # Send ACK
+        p = packet.packet(True, False, True, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent fin ack')
+
+        print('add to drink completed')
+    
+    except socket.timeout as inst:
+        print('timeout!')
+        send_add_to_tab(client, total)
+        return
+
+    server.settimeout(None)
+
+def add_to_tab(client, split):
+    global clients
+    
+    drink = split[2]
+    quantity = int(split[3])
 
     price = -1
     drinks = data['drinks']
@@ -148,30 +192,8 @@ def add_to_tab(client, body):
     for c in clients:
         if c.client_id == client.client_id:
             c.total = c.total + total
-
-            # Total Message
-            try:
-                # Total Message
-                msg = "TOTAL " + str(c.total)
-                p = packet.packet(False, False, False, c.client_id, None, c.client_public, msg)
-                server.sendto(p.encrypted_raw, client.address)
-                print('total sent')
-
-                # ACK Recieve
-                message, address = server.recvfrom(config.buffer_size)
-                (client_id, flags, length, body) = separate_message(message)
-                if flags[0] == 1:
-                    print('ack recieved')
-                else:
-                    print('err')
             
-            except socket.timeout as inst:
-                print('timeout!')
-                add_to_tab(client, body)
-
-            break
-
-    server.settimeout(None)
+            send_add_to_tab(c, total)
 
 def close_tab(client):
     server.settimeout(1)
@@ -225,6 +247,9 @@ def separate_message(message):
 # Processes the message
 def process_message(sequence, flags, length, body, address):
     global clients
+
+    body = body.decode('ASCII')
+    split = body.split(' ')
     
     # RSA Exchange
     if flags[1] == 1:
@@ -239,7 +264,7 @@ def process_message(sequence, flags, length, body, address):
         send_public_key(address)
     
     # OPEN Tab
-    elif body == b"OPEN":
+    elif split[0] == "OPEN":
         # Creates ID
         new_id = create_id_code()
 
@@ -254,7 +279,7 @@ def process_message(sequence, flags, length, body, address):
         send_id(client)
 
     # ADD to tab
-    elif body[0:3] == "ADD":
+    elif split[1] == "ADD":
         client = None
         
         # Finds client
@@ -263,14 +288,14 @@ def process_message(sequence, flags, length, body, address):
                 client = c
                 break
 
-        add_to_tab(client, body)
+        add_to_tab(client, split)
 
-    elif body[0:5] == "CLOSE":
+    elif split[0] == "CLOSE":
         client = None
         
         # Finds client
         for c in clients:
-            if c.address == address:
+            if c.client_id == split[0]:
                 client = c
                 break
 
