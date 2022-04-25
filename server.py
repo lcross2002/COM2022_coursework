@@ -6,6 +6,7 @@ import packet
 import mapping
 import rsa
 import json
+import random
 
 # Loading JSON
 f = open('drinks.json')
@@ -46,6 +47,7 @@ def send_public_key(address):
             return
 
         print('rsa exchange completed')
+        print('')
 
     except socket.timeout as inst:
         print('timeout!')
@@ -89,6 +91,7 @@ def send_id(client):
         print('sent fin ack')
 
         print('id exchange completed')
+        print('')
 
     except socket.timeout as inst:
         print('timeout!')
@@ -106,26 +109,25 @@ def create_id_code():
     if len(clients) == 0:
         return 1
 
-    # Algorithm which finds the lowest available ID number
-    found = False
-    new_id = -1
-    prev = 0
+    x = random.randint(1, max_clients)
+
+    arr = []
     for c in clients:
-        if c.client_id != 0:
-            if (c.client_id - prev) != 1:
-                new_id = c.client_id
-                found = True
-                break
-            else:
-                prev = c.client_id
+        arr.append(c.client_id)
 
-    if found == False:
-        new_id = len(clients)
+    dupe = False
 
-    if new_id == -1:
-        print('cannot find id')
-    else:
-        return new_id
+    if x in arr:
+        dupe = True
+
+    while dupe == True:
+        x = random.randint(1, max_clients)
+        if x in arr:
+            dupe = True
+        else:
+            dupe = False
+
+    return x
 
 def send_add_to_tab(client, total):
     server.settimeout(1)
@@ -162,6 +164,7 @@ def send_add_to_tab(client, total):
         print('sent fin ack')
 
         print('add to drink completed')
+        print('')
     
     except socket.timeout as inst:
         print('timeout!')
@@ -173,8 +176,8 @@ def send_add_to_tab(client, total):
 def add_to_tab(client, split):
     global clients
     
-    drink = split[2]
-    quantity = int(split[3])
+    drink = split[3]
+    quantity = int(split[4])
 
     price = -1
     drinks = data['drinks']
@@ -204,23 +207,39 @@ def close_tab(client):
     try:
         # Fin Message
         msg = "TOTAL " + str(client.total)
-        p = packet.packet(False, False, True, client.client_id, None, client.client_public, msg)
+        p = packet.packet(True, False, False, 1, None, client.client_public, msg, False)
         server.sendto(p.encrypted_raw, client.address)
-        print('fin total sent')
+        print('total sent')
+
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
 
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
-        (client_id, flags, length, body) = separate_message(message)
+        (sequence, flags, length, body) = separate_message(message)
         if flags[0] == 1 and flags[2] == 1:
             print('ack fin recieved')
         else:
             print('err')
+
+        # Send ACK
+        p = packet.packet(True, False, True, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent fin ack')
 
         # Remove from list
         for c in clients:
             if c.address == client.address:
                 clients.remove(c)
                 break
+
+        print('client close completed')
+        print('')
 
     except socket.timeout as inst:
         print('timeout!')
@@ -278,8 +297,20 @@ def process_message(sequence, flags, length, body, address):
 
         send_id(client)
 
+    # CLOSE Tab
+    elif split[0] == "CLOSE":
+        client = None
+        
+        # Finds client
+        for c in clients:
+            if c.address == address:
+                client = c
+                break
+
+        close_tab(client)
+
     # ADD to tab
-    elif split[1] == "ADD":
+    elif split[2] == "ADD":
         client = None
         
         # Finds client
@@ -289,17 +320,6 @@ def process_message(sequence, flags, length, body, address):
                 break
 
         add_to_tab(client, split)
-
-    elif split[0] == "CLOSE":
-        client = None
-        
-        # Finds client
-        for c in clients:
-            if c.client_id == split[0]:
-                client = c
-                break
-
-        close_tab(client)
 
 #
 while True:

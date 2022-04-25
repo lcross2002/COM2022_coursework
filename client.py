@@ -173,7 +173,7 @@ def send_drink(choice, quantity):
     # Send drink choice
     try:
         # Add drink Message
-        msg = str(client_id_global) + " ADD " + str(choice) + " " + str(quantity)
+        msg = "ID " + str(client_id_global) + "\r\n ADD " + str(choice) + " " + str(quantity)
         p = packet.packet(False, False, False, 0, None, server_public, msg, False)
         client.sendto(p.encrypted_raw, (config.address, config.port))
         print('add drink sent')
@@ -290,6 +290,7 @@ def viewTab():
 def closeTab():
     global client_id_global
     global server_public
+    global tab
 
     print('closing tab')
     print('')
@@ -297,42 +298,64 @@ def closeTab():
     # Closing tab
     try:
         # Close message
-        p = packet.packet(False, False, False, client_id_global, None, server_public, 'CLOSE')
+        p = packet.packet(False, False, False, 0, None, server_public, 'CLOSE', False)
         client.sendto(p.encrypted_raw, (config.address, config.port))
         print('close tab sent')
 
         # ACK Recieve
         message, server = client.recvfrom(config.buffer_size)
-        (client_id, flags, length, body) = separate_message(message)
-        if flags[0] == 1:
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and sequence == 0:
             print('ack recieved')
         else:
             print('err')
+            closeTab()
+            return
 
-        # Fin Recieve
+        # ACK Recieve
         message, server = client.recvfrom(config.buffer_size)
-        message = decrypt_message(message)
-        (client_id, flags, length, body) = separate_message(message)
-        if flags[0] == 0 and flags[2] == 1:
+        (sequence, flags, length, body) = separate_message(message)
+        msg = decrypt_message(body)
+        msg = msg.decode('ASCII')
+        split = msg.split(' ')
+        if flags[0] == 1:
             print('fin recieved')
             print(body)
 
             # Send empty ACK
-            p = packet.packet(True, False, True, 0, None, None, None)
+            p = packet.packet(True, False, True, 1, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('ack sent')
+
+            # Send ACK FIN
+            p = packet.packet(True, False, True, 2, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack fin sent')
+
+            # Final ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1 and flags[2] == 1:
+                print('fin ack recieved')
+            else:
+                print('err')
 
             # Reset global variables
             client_id_global = None
             tab = 0
             server_public = None
 
+            print('close tab completed')
+
         else:
             print('err')
+            closeTab()
+            return
 
     except socket.timeout as inst:
         print('timeout!')
         closeTab()
+        return
 
 # 
 while True:
