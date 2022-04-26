@@ -46,6 +46,21 @@ def send_public_key(address):
             send_public_key(address)
             return
 
+        # ACK FIN Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and flags[2] == 1:
+            print('ack fin recieved')
+        else:
+            print('err')
+            send_public_key(address)
+            return
+
+        # Send ACK
+        p = packet.packet(True, False, True, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent fin ack')
+
         print('rsa exchange completed')
         print('')
 

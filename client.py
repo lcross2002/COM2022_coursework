@@ -84,6 +84,21 @@ def rsa_exchange():
                 client.sendto(p.encrypted_raw, (config.address, config.port))
                 print('ack sent')
 
+                sequence_check += 1
+
+                # Send FIN
+                p = packet.packet(True, False, True, sequence_check, None, None, None, False)
+                client.sendto(p.encrypted_raw, (config.address, config.port))
+                print('fin ack sent')
+
+                # Final ACK Recieve
+                message, server = client.recvfrom(config.buffer_size)
+                (sequence, flags, length, body) = separate_message(message)
+                if flags[0] == 1 and flags[2] == 1:
+                    print('fin ack recieved')
+                else:
+                    print('err')
+
         except socket.timeout as inst:
             print('timeout!')
             
@@ -284,7 +299,7 @@ def addToTab():
 
 # Views existing tab value
 def viewTab():
-    print('your current tab value is ' + str(tab))
+    print('your current tab value is £' + str(round(float(tab), 2)))
 
 # Closes a tab
 def closeTab():
