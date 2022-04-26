@@ -347,6 +347,7 @@ def addToTab():
     print('')
     print('Enter the quantity:')
     quantity = input()
+    print('')
 
     send_drink(choice, quantity)
 
@@ -363,10 +364,12 @@ def closeTab():
     print('closing tab')
     print('')
 
+    sequence_check = 0
+
     # Closing tab
     try:
         # Close message
-        p = packet.packet(False, False, False, 0, None, server_public, 'CLOSE', False)
+        p = packet.packet(False, False, False, sequence_check, None, server_public, 'CLOSE', False)
         client.sendto(p.encrypted_raw, (config.address, config.port))
         print('close tab sent')
 
@@ -379,6 +382,8 @@ def closeTab():
             print('err')
             closeTab()
             return
+
+        sequence_check += 1
 
         # ACK Recieve
         message, server = client.recvfrom(config.buffer_size)
