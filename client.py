@@ -91,6 +91,16 @@ def rsa_exchange():
                 client.sendto(p.encrypted_raw, (config.address, config.port))
                 print('fin ack sent')
 
+                # Generic ACK Recieve
+                message, server = client.recvfrom(config.buffer_size)
+                (sequence, flags, length, body) = separate_message(message)
+                if flags[0] == 1:
+                    print('generic ack recieved')
+                else:
+                    print('err')
+
+                sequence_check += 1
+
                 # Final ACK Recieve
                 message, server = client.recvfrom(config.buffer_size)
                 (sequence, flags, length, body) = separate_message(message)
@@ -98,6 +108,11 @@ def rsa_exchange():
                     print('fin ack recieved')
                 else:
                     print('err')
+
+                # Send Generic ACK
+                p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+                client.sendto(p.encrypted_raw, (config.address, config.port))
+                print('ack sent')
 
         except socket.timeout as inst:
             print('timeout!')
@@ -122,7 +137,7 @@ def open_tab():
 
     print('')
 
-    sequence_check = 2
+    sequence_check = 0
 
     try:
         # OPEN Message
@@ -156,10 +171,22 @@ def open_tab():
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('ack sent')
 
+            sequence_check += 1
+
             # Send FIN
             p = packet.packet(True, False, True, sequence_check, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('fin ack sent')
+
+            # Generic ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('generic ack recieved')
+            else:
+                print('err')
+
+            sequence_check += 1
 
             # Final ACK Recieve
             message, server = client.recvfrom(config.buffer_size)
@@ -168,6 +195,11 @@ def open_tab():
                 print('fin ack recieved')
             else:
                 print('err')
+
+            # Send Generic ACK
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
 
             print('open tab completed')
 
@@ -184,6 +216,8 @@ def createTab():
 def send_drink(choice, quantity):
     global client_id_global
     global tab
+
+    sequence_check = 0
 
     # Send drink choice
     try:
@@ -203,6 +237,8 @@ def send_drink(choice, quantity):
             send_drink()
             return
 
+        sequence_check += 1
+
         # Total Recieve
         message, server = client.recvfrom(config.buffer_size)
         print(message)
@@ -215,14 +251,26 @@ def send_drink(choice, quantity):
             print('total recieved ' + tab)
 
             # Send empty ACK
-            p = packet.packet(True, False, False, 1, None, None, None, False)
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('ack sent')
 
-            # Send ACK FIN
-            p = packet.packet(True, False, True, 2, None, None, None, False)
+            sequence_check += 1
+
+            # Send FIN
+            p = packet.packet(True, False, True, sequence_check, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('ack fin sent')
+            print('fin ack sent')
+
+            # Generic ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('generic ack recieved')
+            else:
+                print('err')
+
+            sequence_check += 1
 
             # Final ACK Recieve
             message, server = client.recvfrom(config.buffer_size)
@@ -231,6 +279,11 @@ def send_drink(choice, quantity):
                 print('fin ack recieved')
             else:
                 print('err')
+
+            # Send Generic ACK
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
 
             print('add to drink completed')
 
@@ -338,14 +391,26 @@ def closeTab():
             print(body)
 
             # Send empty ACK
-            p = packet.packet(True, False, True, 1, None, None, None, False)
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('ack sent')
 
-            # Send ACK FIN
-            p = packet.packet(True, False, True, 2, None, None, None, False)
+            sequence_check += 1
+
+            # Send FIN
+            p = packet.packet(True, False, True, sequence_check, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('ack fin sent')
+            print('fin ack sent')
+
+            # Generic ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('generic ack recieved')
+            else:
+                print('err')
+
+            sequence_check += 1
 
             # Final ACK Recieve
             message, server = client.recvfrom(config.buffer_size)
@@ -354,6 +419,11 @@ def closeTab():
                 print('fin ack recieved')
             else:
                 print('err')
+
+            # Send Generic ACK
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
 
             # Reset global variables
             client_id_global = None

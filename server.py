@@ -49,17 +49,32 @@ def send_public_key(address):
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
-        if flags[0] == 1 and flags[2] == 1:
+        if flags[2] == 1:
             print('ack fin recieved')
         else:
             print('err')
             send_public_key(address)
             return
 
-        # Send ACK
-        p = packet.packet(True, False, True, 2, None, None, None, False)
+        # Send Generic ACK
+        p = packet.packet(True, False, False, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent generic ack')
+
+        # Send Fin ACK
+        p = packet.packet(True, False, True, 3, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
+
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
+            send_public_key(address)
+            return
 
         print('rsa exchange completed')
         print('')
@@ -84,26 +99,43 @@ def send_id(client):
 
         # ACK Recieve
         message, address = server.recvfrom(config.buffer_size)
-        (sequence, flags, length, body) = separate_message(message)
+        (client_id, flags, length, body) = separate_message(message)
         if flags[0] == 1:
             print('ack recieved')
         else:
-            print('err not ack')
-            send_id(client)
+            print('err')
+            send_public_key(address)
             return
 
-        # FIN Recieve
+        # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
-        if flags[0] == 1 and flags[2] == 1:
-            print('fin ack recieved')
+        if flags[2] == 1:
+            print('ack fin recieved')
         else:
-            print('err not fin ack recieved')
+            print('err')
+            send_public_key(address)
+            return
 
-        # Send ACK
-        p = packet.packet(True, False, True, 2, None, None, None, False)
+        # Send Generic ACK
+        p = packet.packet(True, False, False, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent generic ack')
+
+        # Send Fin ACK
+        p = packet.packet(True, False, True, 3, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
+
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
+            send_public_key(address)
+            return
 
         print('id exchange completed')
         print('')
@@ -157,26 +189,43 @@ def send_add_to_tab(client, total):
 
         # ACK Recieve
         message, address = server.recvfrom(config.buffer_size)
-        (sequence, flags, length, body) = separate_message(message)
-        if flags[0] == 1 and sequence == 1:
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
             print('ack recieved')
         else:
             print('err')
-            send_add_to_tab()
+            send_public_key(address)
             return
 
-        # FIN Recieve
+        # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
-        if flags[0] == 1 and flags[2] == 1:
-            print('fin ack recieved')
+        if flags[2] == 1:
+            print('ack fin recieved')
         else:
-            print('err not fin ack recieved')
+            print('err')
+            send_public_key(address)
+            return
 
-        # Send ACK
-        p = packet.packet(True, False, True, 2, None, None, None, False)
+        # Send Generic ACK
+        p = packet.packet(True, False, False, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent generic ack')
+
+        # Send Fin ACK
+        p = packet.packet(True, False, True, 3, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
+
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
+            send_public_key(address)
+            return
 
         print('add to drink completed')
         print('')
@@ -209,9 +258,8 @@ def add_to_tab(client, split):
 
     for c in clients:
         if c.client_id == client.client_id:
+            send_add_to_tab(c, (c.total + total))
             c.total = c.total + total
-            
-            send_add_to_tab(c, total)
 
 def close_tab(client):
     server.settimeout(1)
@@ -228,24 +276,43 @@ def close_tab(client):
 
         # ACK Recieve
         message, address = server.recvfrom(config.buffer_size)
-        (sequence, flags, length, body) = separate_message(message)
+        (client_id, flags, length, body) = separate_message(message)
         if flags[0] == 1:
             print('ack recieved')
         else:
             print('err')
+            send_public_key(address)
+            return
 
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
-        if flags[0] == 1 and flags[2] == 1:
+        if flags[2] == 1:
             print('ack fin recieved')
         else:
             print('err')
+            send_public_key(address)
+            return
 
-        # Send ACK
-        p = packet.packet(True, False, True, 2, None, None, None, False)
+        # Send Generic ACK
+        p = packet.packet(True, False, False, 2, None, None, None, False)
+        server.sendto(p.encrypted_raw, address)
+        print('sent generic ack')
+
+        # Send Fin ACK
+        p = packet.packet(True, False, True, 3, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
+
+        # ACK Recieve
+        message, address = server.recvfrom(config.buffer_size)
+        (client_id, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('ack recieved')
+        else:
+            print('err')
+            send_public_key(address)
+            return
 
         # Remove from list
         for c in clients:
