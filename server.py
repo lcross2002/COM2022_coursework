@@ -196,7 +196,7 @@ def send_add_to_tab(client, total):
     # Total Message
     try:
         # Total Message
-        msg = "TOTAL " + str(c.total)
+        msg = "TOTAL " + str(total)
         p = packet.packet(False, False, False, sequence_check, None, c.client_public, msg, False)
         server.sendto(p.encrypted_raw, client.address)
         print('total sent')
