@@ -21,7 +21,7 @@ tab = 0
 server_public = None
 
 # Socket settings
-socket.setdefaulttimeout(1)
+socket.setdefaulttimeout(5)
 
 # Creates socket [address type, udp]
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -136,6 +136,8 @@ def open_tab():
     global client_id_global
 
     print('')
+    print('Opening tab')
+    print('')
 
     sequence_check = 0
 
@@ -222,7 +224,7 @@ def send_drink(choice, quantity):
     # Send drink choice
     try:
         # Add drink Message
-        msg = "ID " + str(client_id_global) + "\r\n ADD " + str(choice) + " " + str(quantity)
+        msg = "ID " + str(client_id_global) + "\r\nADD " + str(choice) + " " + str(quantity)
         p = packet.packet(False, False, False, 0, None, server_public, msg, False)
         client.sendto(p.encrypted_raw, (config.address, config.port))
         print('add drink sent')
@@ -369,7 +371,8 @@ def closeTab():
     # Closing tab
     try:
         # Close message
-        p = packet.packet(False, False, False, sequence_check, None, server_public, 'CLOSE', False)
+        msg = "ID " + str(client_id_global) + "\r\nCLOSE"
+        p = packet.packet(False, False, False, sequence_check, None, server_public, msg, False)
         client.sendto(p.encrypted_raw, (config.address, config.port))
         print('close tab sent')
 

@@ -259,7 +259,11 @@ def add_to_tab(client, split):
     global clients
     
     drink = split[3]
-    quantity = int(split[4])
+
+    if len(split) < 5:
+        quantity = 1
+    else:
+        quantity = int(split[4])
 
     price = -1
     drinks = data['drinks']
@@ -374,6 +378,7 @@ def process_message(sequence, flags, length, body, address):
     global clients
 
     body = body.decode('ASCII')
+    body = body.replace('\r\n', ' ')
     split = body.split(' ')
     
     # RSA Exchange
@@ -401,7 +406,7 @@ def process_message(sequence, flags, length, body, address):
                 break
 
     # CLOSE Tab
-    elif split[0] == "CLOSE":
+    elif split[2] == "CLOSE":
         client = None
         
         # Finds client
