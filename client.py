@@ -379,55 +379,71 @@ def closeTab():
         # ACK Recieve
         message, server = client.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
-        msg = decrypt_message(body)
-        msg = msg.decode('ASCII')
-        split = msg.split(' ')
         if flags[0] == 1:
             print('fin recieved')
             print(body)
 
             sequence_check += 1
 
-            # Send FIN
-            p = packet.packet(True, False, True, sequence_check, None, None, None, False)
-            client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('fin ack sent')
-
-            # Generic ACK Recieve
+            # Total Recieve
             message, server = client.recvfrom(config.buffer_size)
             (sequence, flags, length, body) = separate_message(message)
-            if flags[0] == 1:
-                print('generic ack recieved')
-            else:
-                print('err')
+            msg = decrypt_message(body)
+            msg = msg.decode('ASCII')
+            print('total recieved ' + msg)
 
-            sequence_check += 1
-
-            # Final ACK Recieve
-            message, server = client.recvfrom(config.buffer_size)
-            (sequence, flags, length, body) = separate_message(message)
-            if flags[0] == 1 and flags[2] == 1:
-                print('fin ack recieved')
-            else:
-                print('err')
-
-            # Send Generic ACK
+            # Send empty ACK
             p = packet.packet(True, False, False, sequence_check, None, None, None, False)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('ack sent')
 
-            # Reset global variables
-            client_id_global = None
-            tab = 0
-            server_public = None
-
-            print('close tab completed')
+            sequence_check += 1
 
         else:
             print('err')
             closeTab()
             return
 
+    except socket.timeout as inst:
+        print('timeout!')
+        closeTab()
+        return
+
+    try:
+        # Send FIN
+        p = packet.packet(False, False, True, sequence_check, None, None, None, False)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('fin ack sent')
+
+        # Generic ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('generic ack recieved')
+        else:
+            print('err')
+
+        sequence_check += 1
+
+        # Final ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and flags[2] == 1:
+            print('fin ack recieved')
+        else:
+            print('err')
+
+        # Send Generic ACK
+        p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('ack sent')
+
+        # Reset global variables
+        client_id_global = None
+        tab = 0
+        server_public = None
+
+        print('close tab completed')
     except socket.timeout as inst:
         print('timeout!')
         closeTab()
