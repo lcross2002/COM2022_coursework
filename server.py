@@ -29,10 +29,12 @@ server.bind(('', config.port))
 def send_public_key(address):
     server.settimeout(1)
 
+    sequence_check = 1
+
     # RSA Exchange
     try:
         # RSA Message
-        p = packet.packet(True, True, False, 1, None, None, server_public.save_pkcs1(), True)
+        p = packet.packet(True, True, False, sequence_check, None, None, server_public.save_pkcs1(), True)
         server.sendto(p.encrypted_raw, address)
         print('rsa sent')
 
@@ -46,6 +48,8 @@ def send_public_key(address):
             send_public_key(address)
             return
 
+        sequence_check += 1
+
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
@@ -57,12 +61,14 @@ def send_public_key(address):
             return
 
         # Send Generic ACK
-        p = packet.packet(True, False, False, 2, None, None, None, False)
+        p = packet.packet(True, False, False, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent generic ack')
 
+        sequence_check += 1
+
         # Send Fin ACK
-        p = packet.packet(True, False, True, 3, None, None, None, False)
+        p = packet.packet(True, False, True, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
 
@@ -88,11 +94,13 @@ def send_public_key(address):
 def send_id(client):
     server.settimeout(1)
 
+    sequence_check = 1
+
     # Send ID
     try:
         # ID Message
         msg = "SETID " + str(client.client_id)
-        p = packet.packet(False, False, False, 1, None, client.client_public, msg, False)
+        p = packet.packet(False, False, False, sequence_check, None, client.client_public, msg, False)
         packet_bytes = p.encrypted_raw
         server.sendto(packet_bytes, client.address)
         print('ID sent')
@@ -107,6 +115,8 @@ def send_id(client):
             send_public_key(address)
             return
 
+        sequence_check += 1
+
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
@@ -118,12 +128,14 @@ def send_id(client):
             return
 
         # Send Generic ACK
-        p = packet.packet(True, False, False, 2, None, None, None, False)
+        p = packet.packet(True, False, False, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent generic ack')
 
+        sequence_check += 1
+
         # Send Fin ACK
-        p = packet.packet(True, False, True, 3, None, None, None, False)
+        p = packet.packet(True, False, True, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
 
@@ -179,11 +191,13 @@ def create_id_code():
 def send_add_to_tab(client, total):
     server.settimeout(1)
 
+    sequence_check = 1
+
     # Total Message
     try:
         # Total Message
         msg = "TOTAL " + str(c.total)
-        p = packet.packet(False, False, False, c.client_id, None, c.client_public, msg, False)
+        p = packet.packet(False, False, False, sequence_check, None, c.client_public, msg, False)
         server.sendto(p.encrypted_raw, client.address)
         print('total sent')
 
@@ -197,6 +211,8 @@ def send_add_to_tab(client, total):
             send_public_key(address)
             return
 
+        sequence_check += 1
+
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
@@ -208,12 +224,14 @@ def send_add_to_tab(client, total):
             return
 
         # Send Generic ACK
-        p = packet.packet(True, False, False, 2, None, None, None, False)
+        p = packet.packet(True, False, False, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent generic ack')
 
+        sequence_check += 1
+
         # Send Fin ACK
-        p = packet.packet(True, False, True, 3, None, None, None, False)
+        p = packet.packet(True, False, True, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
 
@@ -266,11 +284,13 @@ def close_tab(client):
 
     global clients
     
+    sequence_check = 1
+
     # Close tab
     try:
         # Fin Message
         msg = "TOTAL " + str(client.total)
-        p = packet.packet(True, False, False, 1, None, client.client_public, msg, False)
+        p = packet.packet(True, False, False, sequence_check, None, client.client_public, msg, False)
         server.sendto(p.encrypted_raw, client.address)
         print('total sent')
 
@@ -284,6 +304,8 @@ def close_tab(client):
             send_public_key(address)
             return
 
+        sequence_check += 1
+
         # ACK FIN Recieve
         message, address = server.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
@@ -295,12 +317,14 @@ def close_tab(client):
             return
 
         # Send Generic ACK
-        p = packet.packet(True, False, False, 2, None, None, None, False)
+        p = packet.packet(True, False, False, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent generic ack')
 
+        sequence_check += 1
+
         # Send Fin ACK
-        p = packet.packet(True, False, True, 3, None, None, None, False)
+        p = packet.packet(True, False, True, sequence_check, None, None, None, False)
         server.sendto(p.encrypted_raw, address)
         print('sent fin ack')
 
@@ -368,16 +392,13 @@ def process_message(sequence, flags, length, body, address):
     elif split[0] == "OPEN":
         # Creates ID
         new_id = create_id_code()
-
-        client = None
+        
         # Applys ID
         for c in clients:
             if c.address == address:
+                send_id(c)
                 c.client_id = new_id
-                client = c
                 break
-
-        send_id(client)
 
     # CLOSE Tab
     elif split[0] == "CLOSE":
