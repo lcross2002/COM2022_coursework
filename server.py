@@ -112,7 +112,7 @@ def send_id(client):
             print('ack recieved')
         else:
             print('err')
-            send_public_key(address)
+            send_id(address)
             return
 
         sequence_check += 1
@@ -124,7 +124,7 @@ def send_id(client):
             print('ack fin recieved')
         else:
             print('err')
-            send_public_key(address)
+            send_id(address)
             return
 
         # Send Generic ACK
@@ -146,7 +146,7 @@ def send_id(client):
             print('ack recieved')
         else:
             print('err')
-            send_public_key(address)
+            send_id(address)
             return
 
         print('id exchange completed')
@@ -396,8 +396,8 @@ def process_message(sequence, flags, length, body, address):
         # Applys ID
         for c in clients:
             if c.address == address:
-                send_id(c)
                 c.client_id = new_id
+                send_id(c)
                 break
 
     # CLOSE Tab
