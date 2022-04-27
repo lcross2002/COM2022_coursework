@@ -379,29 +379,12 @@ def closeTab():
         # ACK Recieve
         message, server = client.recvfrom(config.buffer_size)
         (sequence, flags, length, body) = separate_message(message)
-        if flags[0] == 1 and sequence == 0:
-            print('ack recieved')
-        else:
-            print('err')
-            closeTab()
-            return
-
-        sequence_check += 1
-
-        # ACK Recieve
-        message, server = client.recvfrom(config.buffer_size)
-        (sequence, flags, length, body) = separate_message(message)
         msg = decrypt_message(body)
         msg = msg.decode('ASCII')
         split = msg.split(' ')
         if flags[0] == 1:
             print('fin recieved')
             print(body)
-
-            # Send empty ACK
-            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
-            client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('ack sent')
 
             sequence_check += 1
 
