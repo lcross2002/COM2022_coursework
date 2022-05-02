@@ -98,12 +98,19 @@ def send_id(client):
 
     # Send ID
     try:
-        # ID Message
-        msg = "SETID " + str(client.client_id)
-        p = packet.packet(False, False, False, sequence_check, None, client.client_public, msg, False)
-        packet_bytes = p.encrypted_raw
-        server.sendto(packet_bytes, client.address)
-        print('ID sent')
+        # Server randomly doesn't send message
+        x = random.choice([True, False])
+        if x == True:
+            # ID Message
+            msg = "SETID " + str(client.client_id)
+            p = packet.packet(False, False, False, sequence_check, None, client.client_public, msg, False)
+            packet_bytes = p.encrypted_raw
+            server.sendto(packet_bytes, client.address)
+            print('ID sent')
+        else:
+            print('purposely not sending message')
+            server.settimeout(None)
+            return       
 
         # ACK Recieve
         message, address = server.recvfrom(config.buffer_size)
@@ -405,29 +412,30 @@ def process_message(sequence, flags, length, body, address):
                 send_id(c)
                 break
 
-    # CLOSE Tab
-    elif split[2] == "CLOSE":
-        client = None
-        
-        # Finds client
-        for c in clients:
-            if c.address == address:
-                client = c
-                break
+    if len(split) > 2:
+        # CLOSE Tab
+        if split[2] == "CLOSE":
+            client = None
+            
+            # Finds client
+            for c in clients:
+                if c.address == address:
+                    client = c
+                    break
 
-        close_tab(client)
+            close_tab(client)
 
-    # ADD to tab
-    elif split[2] == "ADD":
-        client = None
-        
-        # Finds client
-        for c in clients:
-            if c.address == address:
-                client = c
-                break
+        # ADD to tab
+        elif split[2] == "ADD":
+            client = None
+            
+            # Finds client
+            for c in clients:
+                if c.address == address:
+                    client = c
+                    break
 
-        add_to_tab(client, split)
+            add_to_tab(client, split)
 
 #
 while True:

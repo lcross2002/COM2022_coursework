@@ -137,7 +137,6 @@ def open_tab():
 
     print('')
     print('Opening tab')
-    print('')
 
     sequence_check = 0
 
@@ -298,25 +297,6 @@ def send_drink(choice, quantity):
 def addToTab():
     global tab
 
-    # True means corrupt packet
-    x = False
-    #x = random.choice([True, False])
-    print(x)
-    if x == True:
-        try:
-            p = packet.packet(False, False, False, client_id_global, None, server_public, "EOSTUOTUHSETOUESHTAOEUTH")
-            client.sendto(p.encrypted_raw, (config.address, config.port))
-            print('sent corrupt packet')
-
-            message, server = client.recvfrom(config.buffer_size)
-            message, server = client.recvfrom(config.buffer_size)
-
-        except socket.timeout as inst:
-            print('timeout')
-            return
-
-        return
-
     if client_id_global == None:
         print('You do not have a tab to add to!')
         print('Press enter to continue:')
@@ -449,6 +429,28 @@ def closeTab():
         closeTab()
         return
 
+def corrupt_packet():
+    try:
+        # Corrupt Packet
+        p = packet.packet(False, False, False, 0, None, None, "WOURHAWOURAHWUO", False)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('corrupt packet sent')
+
+        # Generic ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1:
+            print('generic ack recieved')
+        else:
+            print('err')
+
+        message, server = client.recvfrom(config.buffer_size)
+        print('err, response recieved')
+
+    except socket.timeout as inst:
+        print('timeout!')
+        print('timeout correctly triggered')
+
 # 
 while True:
     # Resets variable
@@ -456,7 +458,6 @@ while True:
 
     print('')
     print('Welcome to The Client of the Bar Tab Protocol (BTP)')
-    print('(Corrupt packet example has a chance to happen when adding to a tab)')
     print('')
     print('Commands:')
     print('')
@@ -465,6 +466,7 @@ while True:
     print('[3] - View tab')
     print('[4] - Close a tab')
     print('[5] - Exit')
+    print('[6] - Send corrupt packet')
     print('')
     print('Enter a value from inside the brackets:')
 
@@ -482,6 +484,8 @@ while True:
         closeTab()
     elif user_input == '5':
         quit()
+    elif user_input == '6':
+        corrupt_packet()
     else:
         print('')
         print('This is not a valid command!')

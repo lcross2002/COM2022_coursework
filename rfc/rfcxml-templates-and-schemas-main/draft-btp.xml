@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-model href="rfc7991bis.rnc"?>
+
+<!DOCTYPE rfc [
+  <!ENTITY nbsp    "&#160;">
+  <!ENTITY zwsp   "&#8203;">
+  <!ENTITY nbhy   "&#8209;">
+  <!ENTITY wj     "&#8288;">
+]>
+
+<rfc
+  xmlns:xi="http://www.w3.org/2001/XInclude"
+  category="info"
+  docName="bar-tab-protocol-rfc"
+  ipr="trust200902"
+  obsoletes=""
+  updates=""
+  submissionType="IETF"
+  xml:lang="en"
+  version="1">
+
+  <front>
+    <title abbrev="BTP">Bar Tab Protocol</title>
+
+    <seriesInfo name="Internet-Draft" value="bar-tab-protocol-rfc"/>
+   
+    <author fullname="Liam Cross" initials="L" surname="Cross"></author>
+    <author fullname="Harry Applegarth-Jones" initials="H" surname="Applegarth-Jones"></author>
+    <author fullname="Mohammed Foroughi" initials="M" surname="Foroughi"></author>
+   
+    <date year="2022" month="4" day="29"/>
+
+    <area>General</area>
+    <workgroup>Internet Engineering Task Force</workgroup>
+    
+    <abstract>
+      <t>This document discusses the Bar Tab Protocol (BTP), a duplex data transferring protocol. </t>
+      <t>The primary function of the BTP is to allow a centralised bar (the server) to keep track of the tabs for different tables (clients).</t>
+    </abstract>
+  </front>
+
+  <middle>
+    <section>
+      <name>Introduction</name>
+      <t>The Bar Tab Protocol (BTP) is a protocol which is intended for bars to utilise in order to keep track of their tabs.</t>
+      <t>It allows clients to connect to a central server to open, add or close tabs.</t>
+      <t>The BTP utilises a request-response cycle to processes the information coming in.</t>
+    </section>
+
+    <section anchor="commands">
+      <name>Commands</name>
+      
+      <section>
+        <name>RSA Exchange</name>
+        <t>The flow for the RSA exchange.</t>
+        <ul spacing="normal">
+          <li>Client MUST send public key in body, RSA Flag MUST be set in header</li>
+          <li>Server MUST save the client's address and public key</li>
+          <li>The server MUST send its own public key in body. RSA and ACK Flags MUST be set to signify the completion of the RSA exchange. This is independant from the RDT</li>
+          <li>Client MUST save the server's public key</li>
+          <li>Finish request sequence MUST occur</li>
+        </ul>
+      </section>
+
+      <section>
+        <name>OPEN</name>
+        <t>The flow when opening a tab.</t>
+        <ul spacing="normal">
+          <li>Client MUST send OPEN in body</li>
+          <li>Server MUST assign unique client ID to address</li>
+          <li>Server MUST send "SETID &lt;client_id&gt;" back to client</li>
+          <li>Server MUST save the ID</li>
+          <li>Finish request sequence MUST occur</li>
+        </ul>
+      </section>
+
+      <section>
+        <name>ADD</name>
+        <t>The flow when adding to a tab.</t>
+        <ul spacing="normal">
+          <li>Client MUST send Client ID and ADD in body</li>
+          <li>Server SHOULD authenticate client and process the order</li>
+          <li>Server MUST send TOTAL in body</li>
+          <li>Finish request sequence MUST occur</li>
+        </ul>
+      </section>
+
+      <section>
+        <name>CLOSE</name>
+        <t>The flow when closing a tab.</t>
+        <ul spacing="normal">
+          <li>Client MUST send CLIENT ID and CLOSE in body</li>
+          <li>Server receives and SHOULD send total again</li>
+          <li>Server SHOULD delete the client, including address and public key</li>
+          <li>Client MUST then pay at the bar</li>
+          <li>Finish request sequence MUST occur</li>
+        </ul>
+      </section>
+    </section>
+
+    <section anchor="rdt">
+      <name>Reliable Data Transfer (RDT)</name>
+      <t>The BTP MUST utilise stop and wait ACK system for reliability. The protocol is designed in a request-response fashion.</t>
+      <t>New requests MUST start with the sequence number = 0, this is then incremented when necessary</t>
+      
+      <t>Sender:</t>
+      <ul spacing="normal">
+        <li>Waits for call. MUST send packet with seq=n and starts timer</li>
+        <li>MUST switch to waiting for ACK</li>
+        <li>If ACK has seq=n, Sender MUST increment n and go back to waiting for a call</li>
+        <li>If ACK does not have seq=n, Sender MUST resend the last packet with seq=n. The timer is then restarted</li>
+        <li>If timeout occurs Sender MUST resend last packet with seq=n. The timer is then restarted</li>
+      </ul>
+
+      <t>Receiver:</t>
+      <ul spacing="normal">
+        <li>Waits for call. If received packet has seq=m, send ACK with seq=n, then increment n and wait for the next packet</li>
+        <li>If the received packet does not have the correct sequence number, send an ACK with seq=k</li>
+      </ul>
+    </section>
+
+    <section anchor="fin">
+      <name>Finishing Requests (FIN)</name>
+      <t>The flow for finishing requests</t>
+      <ul spacing="normal">
+        <li>When a client is ready to finish a request it MUST send a packet with FIN set in the header</li>
+        <li>Independant from RDT, the server sends FIN and ACK set in the header</li>
+      </ul>
+    </section>
+
+    <section anchor="packet-design">
+      <name>Packet Design</name>
+      <figure>
+        <name>The Packet Design</name>
+        <artset>
+          <artwork type="ascii-art" name="box.txt">
+          <![CDATA[                                
+                                4 bytes
+          <---------------------------------------------------->
+
+        ^ +----------------------------------------------------+
+        | |                     sequence                       |
+2 words | +-----+-----+-----+-------+--------------------------+
+        | | ack | rsa | fin | flags |         length           |
+        v +-----+-----+-----+-------+--------------------------+
+          |                                                    |
+          |                 payload (variable)                 |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          |                                                    |
+          +----------------------------------------------------+]]>
+          </artwork>
+        </artset>      
+      </figure>
+
+      <section anchor="header">
+        <name>BTP Header</name>
+        <ul spacing="normal">
+          <li>"LENGTH": the length of the payload in bytes. Minimum length is 0</li>
+          <li>"ACK": a single bit denoting acknowledgement</li>
+          <li>"RSA": a bit used in key exchange</li>
+          <li>"FIN": a single bit used wheen a client is closing a tab</li>
+          <li>"SEQUENCE": Sequence ID of the packet</li>
+        </ul>
+      </section>
+      
+      <section anchor="body">
+        <name>BTP Body</name>
+        <ul spacing="normal">
+          <li>The string encoding COULD be ASCII</li>
+          <li>When exchanging keys, the payload MUST be a continuous stream of bytes denoting the public key</li>
+        </ul>
+
+        <t>Client Messages</t>
+        <ul spacing="normal">
+          <li>"ID &lt;client_id&gt;\r\n" denotes the client ID to the server. This MUST come first</li>
+          <li>"OPEN" denotes a request for opening a tab</li>
+          <li>"ADD &lt;drink_id&gt; [&lt;quantity&gt;]" denotes a singular drink request. Quantity is optional</li>
+          <li>"CLOSE" denotes a request for paying the bill and closing the tab</li>
+        </ul>
+
+        <t>Server Messages</t>
+        <ul spacing="normal">
+          <li>"TOTAL &lt;value&gt;" denotes the accumulated tab total. a 2dp value</li>
+          <li>"SETID &lt;client_id&gt;" denotes the client ID being sent from the server to the client</li>
+        </ul>
+      </section>
+      
+    </section>
+    
+    <section anchor="Security">
+      <name>Security Considerations</name>
+      <t>The packets are encrypted so that any malicious individuals cannot access the contents of the packet.</t>
+      <t>Furthermore, the protocol SHOULD only allow in-house ip addresses, in order to make it harder for malicious individuals to attack the server.</t>
+    </section>
+  </middle>
+
+  <back>
+  </back>
+</rfc>
