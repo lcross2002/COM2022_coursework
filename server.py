@@ -119,7 +119,7 @@ def send_id(client):
             print('ack recieved')
         else:
             print('err')
-            send_id(address)
+            send_id(client)
             return
 
         sequence_check += 1
@@ -131,7 +131,7 @@ def send_id(client):
             print('ack fin recieved')
         else:
             print('err')
-            send_id(address)
+            send_id(client)
             return
 
         # Send Generic ACK
@@ -153,7 +153,7 @@ def send_id(client):
             print('ack recieved')
         else:
             print('err')
-            send_id(address)
+            send_id(client)
             return
 
         print('id exchange completed')
@@ -289,6 +289,7 @@ def add_to_tab(client, split):
         if c.client_id == client.client_id:
             send_add_to_tab(c, (c.total + total))
             c.total = c.total + total
+            break
 
 def close_tab(client):
     server.settimeout(1)
@@ -364,6 +365,38 @@ def close_tab(client):
 
     server.settimeout(None)
 
+def add_to_tab_multiple(client, split):
+    global clients
+    
+    length = (len(split) - 2) / 3
+    length = int(length)
+
+    total = 0
+    for i in range(0, length):
+        drink = split[(i*3)+3]
+        quantity = int(split[(i*3)+4])
+
+        price = -1
+        drinks = data['drinks']
+        for d in drinks:
+            if d['id'] == drink:
+                price = d['price']
+                break
+
+        if price == -1:
+            print('could not find drink with that id')
+            return
+
+        total = total + (price * quantity)
+
+    print('multiple drink total correctly calculated')
+
+    for c in clients:
+        if c.client_id == client.client_id:
+            send_add_to_tab(c, (c.total + total))
+            c.total = c.total + total
+            break
+
 # Decrypts the message
 def decrypt_message(body):
     decrypted_message = rsa.decrypt(body, server_private)
@@ -400,6 +433,18 @@ def process_message(sequence, flags, length, body, address):
         # Then sends public key
         send_public_key(address)
     
+    # Add multiple
+    elif flags[3] == 1:
+        client = None
+            
+        # Finds client
+        for c in clients:
+            if c.address == address:
+                client = c
+                break
+
+        add_to_tab_multiple(client, split)
+
     # OPEN Tab
     elif split[0] == "OPEN":
         # Creates ID
@@ -412,7 +457,7 @@ def process_message(sequence, flags, length, body, address):
                 send_id(c)
                 break
 
-    if len(split) > 2:
+    elif len(split) > 2:
         # CLOSE Tab
         if split[2] == "CLOSE":
             client = None

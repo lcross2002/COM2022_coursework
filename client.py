@@ -56,6 +56,7 @@ def rsa_exchange():
         try:
             # RSA Message
             p = packet.packet(False, True, False, sequence_check, None, None, client_public.save_pkcs1(), True)
+            print(p.encrypted_raw)
             client.sendto(p.encrypted_raw, (config.address, config.port))
             print('rsa sent')
             waitingForAck = True
@@ -451,6 +452,144 @@ def corrupt_packet():
         print('timeout!')
         print('timeout correctly triggered')
 
+def send_drinks(choices, quantities):
+    global client_id_global
+    global tab
+
+    sequence_check = 0
+
+    # Send drink choice
+    try:
+        # Add drink Message
+        msg = "ID " + str(client_id_global)
+
+        for i in range(0, len(choices)):
+            msg = msg + " ADD " + choices[i] + " " + quantities[i]
+
+        print(msg)
+        flags = [True, False, False, False, False, False, False, False, False, False, False, False, False]
+        p = packet.packet(False, False, False, sequence_check, flags, server_public, msg, False)
+        client.sendto(p.encrypted_raw, (config.address, config.port))
+        print('add drink sent')
+
+        # ACK Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        (sequence, flags, length, body) = separate_message(message)
+        if flags[0] == 1 and sequence == 0:
+            print('correct ack recieved')
+        else:
+            print('err')
+            send_drinks(choices, quantities)
+            return
+
+        sequence_check += 1
+
+        # Total Recieve
+        message, server = client.recvfrom(config.buffer_size)
+        print(message)
+        (sequence, flags, length, body) = separate_message(message)
+        msg = decrypt_message(body)
+        msg = msg.decode('ASCII')
+        split = msg.split(' ')
+        if split[0] == "TOTAL":
+            tab = str(split[1])
+            print('total recieved ' + tab)
+
+            # Send empty ACK
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
+
+            sequence_check += 1
+
+            # Send FIN
+            p = packet.packet(True, False, True, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('fin ack sent')
+
+            # Generic ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1:
+                print('generic ack recieved')
+            else:
+                print('err')
+
+            sequence_check += 1
+
+            # Final ACK Recieve
+            message, server = client.recvfrom(config.buffer_size)
+            (sequence, flags, length, body) = separate_message(message)
+            if flags[0] == 1 and flags[2] == 1:
+                print('fin ack recieved')
+            else:
+                print('err')
+
+            # Send Generic ACK
+            p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+            client.sendto(p.encrypted_raw, (config.address, config.port))
+            print('ack sent')
+
+            print('add to drink completed')
+
+    except socket.timeout as inst:
+        print('timeout!')
+        send_drinks(choices, quantities)
+        return
+
+def add_multiple_to_tab():
+    done = False
+    choices = []
+    quantities = []
+
+    while done == False:
+        if client_id_global == None:
+            print('You do not have a tab to add to!')
+            print('Press enter to continue:')
+            input()
+            print('')
+            return
+
+        # Get user drink choice
+        drinks = data['drinks']
+
+        print('drinks:')
+        for drink in drinks:
+            print('[' + str(drink['id']) + '] - ' + drink['name'] + ': £' + str(drink['price']))
+
+        print('')
+        print('Enter a value from inside the brackets:')
+        choice = input()
+
+        found = False
+        for drink in drinks:
+            if drink['id'] == choice:
+                found = True
+                break
+
+        if found == False:
+            print('this drink does not exist')
+            print('')
+            return
+
+        print('')
+        print('Enter the quantity:')
+        quantity = input()
+        print('')
+
+        choices.append(choice)
+        quantities.append(quantity)
+
+        print('Are you finished ordering?')
+        print('[1] - Yes')
+        print('')
+        x = input()
+
+        if x == '1':
+            done = True
+        
+    send_drinks(choices, quantities)
+
 # 
 while True:
     # Resets variable
@@ -467,6 +606,7 @@ while True:
     print('[4] - Close a tab')
     print('[5] - Exit')
     print('[6] - Send corrupt packet')
+    print('[7] - Add multiple drinks to tab')
     print('')
     print('Enter a value from inside the brackets:')
 
@@ -486,6 +626,8 @@ while True:
         quit()
     elif user_input == '6':
         corrupt_packet()
+    elif user_input == '7':
+        add_multiple_to_tab()
     else:
         print('')
         print('This is not a valid command!')

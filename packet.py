@@ -36,11 +36,11 @@ class packet:
     # Calculates length
     def calculate_length(self):
         if self.isRSAKey:
-            self.length = 8 + len(self.body)
+            self.length = len(self.body)
         elif self.body != None:
-            self.length = 8 + len(bytes(self.body, 'ASCII'))
+            self.length = len(bytes(self.body, 'ASCII'))
         else:
-            self.length = 8
+            self.length = 0
 
     # Converts the packet to bytes
     def convert_to_bytes(self):
