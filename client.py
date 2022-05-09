@@ -19,6 +19,7 @@ f.close()
 client_id_global = None
 tab = 0
 server_public = None
+tested = True
 
 # Socket settings
 socket.setdefaulttimeout(5)
@@ -45,6 +46,7 @@ def decrypt_message(message):
 def rsa_exchange():
     global server_public
     global client_id_global
+    global tested
 
     if client_id_global == None:
         print('Creating tab')
@@ -81,9 +83,15 @@ def rsa_exchange():
                 print('rsa recieved ' + str(body))
 
                 # Send empty ACK
-                p = packet.packet(True, False, False, sequence_check, None, None, None, False)
-                client.sendto(p.encrypted_raw, (config.address, config.port))
-                print('ack sent')
+                if tested == False:
+                    p = packet.packet(True, False, False, sequence_check-1, None, None, None, False)
+                    client.sendto(p.encrypted_raw, (config.address, config.port))
+                    print('wrong ack sent')
+                    tested = True
+                else:
+                    p = packet.packet(True, False, False, sequence_check, None, None, None, False)
+                    client.sendto(p.encrypted_raw, (config.address, config.port))
+                    print('ack sent')
 
                 sequence_check += 1
 
@@ -99,6 +107,8 @@ def rsa_exchange():
                     print('generic ack recieved')
                 else:
                     print('err')
+                    rsa_exchange()
+                    return
 
                 sequence_check += 1
 
@@ -109,6 +119,8 @@ def rsa_exchange():
                     print('fin ack recieved')
                 else:
                     print('err')
+                    rsa_exchange()
+                    return
 
                 # Send Generic ACK
                 p = packet.packet(True, False, False, sequence_check, None, None, None, False)
@@ -433,7 +445,11 @@ def closeTab():
 def corrupt_packet():
     try:
         # Corrupt Packet
-        p = packet.packet(False, False, False, 0, None, None, "WOURHAWOURAHWUO", False)
+        #msg = "WAEAWEAWJEAWOE"
+        choice = "01"
+        quantity = 4
+        msg = "ID " + str(client_id_global) + "\r\nADD " + str(choice) + " " + str(quantity)
+        p = packet.packet(False, False, False, 7, None, None, msg, False)
         client.sendto(p.encrypted_raw, (config.address, config.port))
         print('corrupt packet sent')
 

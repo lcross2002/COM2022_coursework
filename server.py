@@ -99,7 +99,8 @@ def send_id(client):
     # Send ID
     try:
         # Server randomly doesn't send message
-        x = random.choice([True, False])
+        #x = random.choice([True, False])
+        x = True
         if x == True:
             # ID Message
             msg = "SETID " + str(client.client_id)
